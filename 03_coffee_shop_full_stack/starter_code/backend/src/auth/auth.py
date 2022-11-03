@@ -1,13 +1,16 @@
 import json
+import sys
+
 from flask import request, _request_ctx_stack
 from functools import wraps
-from jose import jwt
+import jwt
+from jwt.exceptions import ExpiredSignatureError
 from urllib.request import urlopen
 
 
-AUTH0_DOMAIN = 'udacity-fsnd.auth0.com'
+AUTH0_DOMAIN = 'dev-np3peh5l.us.auth0.com'
 ALGORITHMS = ['RS256']
-API_AUDIENCE = 'dev'
+API_AUDIENCE = 'http://127.0.0.1/coffee_shop'
 
 ## AuthError Exception
 '''
@@ -30,8 +33,15 @@ class AuthError(Exception):
         it should raise an AuthError if the header is malformed
     return the token part of the header
 '''
+
 def get_token_auth_header():
-   raise Exception('Not Implemented')
+    auth_header = request.headers.get('Authorization',False)
+    if not auth_header:
+        raise AuthError(error='no_header',status_code=401)
+    token = auth_header.split(" ")
+    if not (len(token) == 2 or token[0].lower()=='bearer'):
+        raise AuthError(error='no_token',status_code=401)
+    return token[1]
 
 '''
 @TODO implement check_permissions(permission, payload) method
@@ -45,7 +55,10 @@ def get_token_auth_header():
     return true otherwise
 '''
 def check_permissions(permission, payload):
-    raise Exception('Not Implemented')
+    if permission in payload['permissions']:
+        return True
+    else:
+        raise AuthError(error='Forbidden',status_code=403)
 
 '''
 @TODO implement verify_decode_jwt(token) method
@@ -61,7 +74,32 @@ def check_permissions(permission, payload):
     !!NOTE urlopen has a common certificate error described here: https://stackoverflow.com/questions/50236117/scraping-ssl-certificate-verify-failed-error-for-http-en-wikipedia-org
 '''
 def verify_decode_jwt(token):
-    raise Exception('Not Implemented')
+    jsonurl = urlopen(f'https://{AUTH0_DOMAIN}/.well-known/jwks.json')
+    jwks = json.loads(jsonurl.read())
+    unverified_header = jwt.get_unverified_header(token)
+    keys = {}
+    if 'kid' not in unverified_header:
+        raise AuthError(error='invalid_header',status_code=401)
+    for jwk in jwks['keys']:
+        keys[jwk['kid']] = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+    rsa = keys[unverified_header['kid']]
+    if rsa:
+        try:
+            payload = jwt.decode(
+                token,
+                rsa,
+                algorithms=ALGORITHMS,
+                audience=API_AUDIENCE,
+                issuer=f'https://{AUTH0_DOMAIN}/'
+            )
+            return payload
+        except ExpiredSignatureError:
+            raise AuthError(error='Expired Signature',status_code=401)
+        except:
+            raise AuthError(error=sys.exc_info()[0],status_code=401)
+    else:
+        raise AuthError(error='invalid_key',status_code=400)
+
 
 '''
 @TODO implement @requires_auth(permission) decorator method

@@ -23,6 +23,7 @@ def setup_db(app):
 
 
 '''
+
 db_drop_and_create_all()
     drops the database tables and starts fresh
     can be used to initialize a clean database
@@ -42,7 +43,6 @@ def db_drop_and_create_all():
 
     drink.insert()
 # ROUTES
-
 '''
 Drink
 a persistent drink entity, extends the base SQLAlchemy Model
@@ -64,7 +64,6 @@ class Drink(db.Model):
     '''
 
     def short(self):
-        print(json.loads(self.recipe))
         short_recipe = [{'color': r['color'], 'parts': r['parts']} for r in json.loads(self.recipe)]
         return {
             'id': self.id,
